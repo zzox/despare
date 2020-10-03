@@ -47,7 +47,12 @@ class PlayState extends FlxState {
 	override public function update(elapsed:Float) {
 		time += elapsed;
 
+		// for all players
 		_player.touchingFloor = _player.isTouching(FlxObject.DOWN);
+
+		if (_player2 != null) {
+			_player2.touchingFloor = _player2.isTouching(FlxObject.DOWN);
+		}
 
 		super.update(elapsed);
 
