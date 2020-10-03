@@ -59,7 +59,7 @@ class PlayState extends FlxState {
 	override public function update(elapsed:Float) {
 		time += elapsed;
 
-		// for all players
+		// TODO: for all players
 		_player.touchingFloor = _player.isTouching(FlxObject.DOWN);
 
 		if (_player2 != null) {
@@ -67,6 +67,8 @@ class PlayState extends FlxState {
 		}
 
 		handleSpawns(elapsed);
+
+		// get rid of dead enemies, or ones off the map
 
 		super.update(elapsed);
 
@@ -102,6 +104,7 @@ class PlayState extends FlxState {
 
 		// set world bounds
 		// set camera bounds
+
 		_spawners = [];
 
 		var s = cast(map.getLayer('spawners'), TiledObjectLayer).objects;
@@ -159,6 +162,8 @@ class PlayState extends FlxState {
 
 				spawner.time = Std.parseFloat(spawner.spot.properties.get('frequency'));
 			}
+
+			spawner.time -= elapsed;
 		}
 	}
 }

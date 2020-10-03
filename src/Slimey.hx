@@ -11,7 +11,7 @@ class Slimey extends FlxSprite {
 	var _health:Int;
 
 	public function new(x:Int, y:Int, direction:String, level:Int) {
-		super(x, y - 16);
+		super(x, y);
 
 		loadGraphic(AssetPaths.slimey__png, true, 24, 24);
 		animation.add('move', [0, 0, 1], 10);
