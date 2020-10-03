@@ -1,3 +1,4 @@
+import Slimey;
 import flixel.FlxG;
 import flixel.FlxObject;
 import flixel.FlxState;
@@ -5,10 +6,16 @@ import flixel.addons.editors.tiled.TiledMap;
 import flixel.addons.editors.tiled.TiledObject;
 import flixel.addons.editors.tiled.TiledObjectLayer;
 import flixel.addons.editors.tiled.TiledTileLayer;
+import flixel.group.FlxGroup.FlxTypedGroup;
 import flixel.math.FlxPoint;
 import flixel.system.scaleModes.PixelPerfectScaleMode;
 import flixel.tile.FlxBaseTilemap.FlxTilemapAutoTiling;
 import flixel.tile.FlxTilemap;
+
+typedef Spawner = {
+	var spot:TiledObject;
+	var time:Float;
+}
 
 class PlayState extends FlxState {
 	var _darkCollision:FlxTilemap;
@@ -16,6 +23,9 @@ class PlayState extends FlxState {
 	var _playerCollision:FlxTilemap;
 	var _player:Player;
 	var _player2:Null<Player>;
+
+	var _spawners:Array<Spawner>;
+	var _slimeys:FlxTypedGroup<Slimey>;
 
 	var _player2Frames:Array<Player.PlayerFrame>;
 	var _player2FramesIndex:Int = 0;
@@ -39,6 +49,8 @@ class PlayState extends FlxState {
 		add(_darkCollision);
 		add(_player);
 		add(_darkForeground);
+		add(_playerCollision);
+		add(_slimeys);
 
 		time = 0.0;
 		_player2Frames = [];
@@ -54,12 +66,15 @@ class PlayState extends FlxState {
 			_player2.touchingFloor = _player2.isTouching(FlxObject.DOWN);
 		}
 
+		handleSpawns(elapsed);
+
 		super.update(elapsed);
 
 		playerFrames();
 
 		FlxG.collide(_darkCollision, _player);
 		FlxG.collide(_playerCollision, _player);
+		FlxG.collide(_darkCollision, _slimeys);
 
 		if (_player2 != null) {
 			FlxG.collide(_darkCollision, _player2);
@@ -82,11 +97,16 @@ class PlayState extends FlxState {
 		_darkForeground.setPosition(0, -4);
 
 		_playerCollision = new FlxTilemap();
-		_playerCollision.loadMapFromArray(cast(map.getLayer('dark-foreground'), TiledTileLayer).tileArray, map.width, map.height, AssetPaths.tiles__png,
+		_playerCollision.loadMapFromArray(cast(map.getLayer('player-collision'), TiledTileLayer).tileArray, map.width, map.height, AssetPaths.tiles__png,
 			map.tileWidth, map.tileHeight, FlxTilemapAutoTiling.OFF, 1, 1, 1);
 
 		// set world bounds
 		// set camera bounds
+		_spawners = [];
+
+		var s = cast(map.getLayer('spawners'), TiledObjectLayer).objects;
+
+		s.map(item -> _spawners.push({spot: item, time: 0.0}));
 
 		camera.setScrollBoundsRect(0, 0, 640, 360);
 		FlxG.worldBounds.set(0, 0, 640, 360);
@@ -96,14 +116,17 @@ class PlayState extends FlxState {
 		_player = new Player(true);
 
 		camera.follow(_player);
+
+		_slimeys = new FlxTypedGroup<Slimey>();
+		// var _battys = new FlxTypedGroup<Batty>();
 	}
 
 	function playerFrames() {
 		_player2Frames.push({
 			x: _player.x,
 			y: _player.y,
-			acceleration: _player.acceleration,
-			velocity: _player.velocity,
+			acceleration: new FlxPoint(_player.acceleration.x, _player.acceleration.y),
+			velocity: new FlxPoint(_player.velocity.x, _player.velocity.y),
 			time: time
 		});
 
@@ -123,6 +146,19 @@ class PlayState extends FlxState {
 			_player2 = new Player(false);
 			time = 0;
 			add(_player2);
+		}
+	}
+
+	function handleSpawns(elapsed:Float) {
+		for (spawner in _spawners) {
+			if (spawner.time <= 0) {
+				if (spawner.spot.properties.get('enemy') == 'slimey') {
+					_slimeys.add(new Slimey(spawner.spot.x, spawner.spot.y, spawner.spot.properties.get('direction'),
+						Std.parseInt(spawner.spot.properties.get('level'))));
+				}
+
+				spawner.time = Std.parseFloat(spawner.spot.properties.get('frequency'));
+			}
 		}
 	}
 }

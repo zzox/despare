@@ -1,9 +1,6 @@
 import flixel.FlxG;
-import flixel.FlxObject;
 import flixel.FlxSprite;
 import flixel.math.FlxPoint;
-import flixel.tile.FlxTileblock;
-import flixel.util.FlxColor;
 
 typedef PlayerFrame = {
 	var x:Float;
@@ -38,10 +35,10 @@ class Player extends FlxSprite {
 
 	var prevState:PrevState;
 
-	static inline final JUMP_VELOCITY = 160;
+	static inline final JUMP_VELOCITY = 150;
 	static inline final RUN_ACCELERATION = 800;
 	static inline final GRAVITY = 800;
-	static inline final JUMP_START_TIME = 0.2;
+	static inline final JUMP_START_TIME = 0.16;
 
 	public function new(real = true) {
 		super(100, 300);
