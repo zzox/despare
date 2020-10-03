@@ -10,13 +10,6 @@ import flixel.system.scaleModes.PixelPerfectScaleMode;
 import flixel.tile.FlxBaseTilemap.FlxTilemapAutoTiling;
 import flixel.tile.FlxTilemap;
 
-typedef PlayerFrame = {
-	var x:Float;
-	var y:Float;
-	var velocity:FlxPoint;
-	var acceleration:FlxPoint;
-}
-
 class PlayState extends FlxState {
 	var _darkCollision:FlxTilemap;
 	var _darkForeground:FlxTilemap;
@@ -24,8 +17,8 @@ class PlayState extends FlxState {
 	var _player:Player;
 	var _player2:Null<Player>;
 
-	var _player2Inputs:Array<Player.InputObj>;
-	var _player2InputsIndex:Int = 0;
+	var _player2Frames:Array<Player.PlayerFrame>;
+	var _player2FramesIndex:Int = 0;
 
 	var time:Float;
 
@@ -47,8 +40,8 @@ class PlayState extends FlxState {
 		add(_player);
 		add(_darkForeground);
 
-		_player2Inputs = [];
 		time = 0.0;
+		_player2Frames = [];
 	}
 
 	override public function update(elapsed:Float) {
@@ -58,7 +51,7 @@ class PlayState extends FlxState {
 
 		super.update(elapsed);
 
-		playerInputs();
+		playerFrames();
 
 		FlxG.collide(_darkCollision, _player);
 		FlxG.collide(_playerCollision, _player);
@@ -95,31 +88,26 @@ class PlayState extends FlxState {
 	}
 
 	function createEntities() {
-		_player = new Player();
+		_player = new Player(true);
 
 		camera.follow(_player);
 	}
 
-	function playerInputs() {
-		var input:Player.InputObj = {
-			left: FlxG.keys.pressed.LEFT,
-			right: FlxG.keys.pressed.RIGHT,
-			up: FlxG.keys.pressed.UP,
-			down: FlxG.keys.pressed.DOWN,
-			jump: FlxG.keys.anyPressed([SPACE, Z]),
+	function playerFrames() {
+		_player2Frames.push({
+			x: _player.x,
+			y: _player.y,
+			acceleration: _player.acceleration,
+			velocity: _player.velocity,
 			time: time
-		};
-
-		_player.changeInputs(input);
-
-		_player2Inputs.push(input);
+		});
 
 		if (_player2 != null) {
-			var nextIndex:Int = _player2InputsIndex + 1;
+			var nextIndex:Int = _player2FramesIndex + 1;
 
-			if (_player2Inputs[nextIndex].time <= time) {
-				_player2.changeInputs(_player2Inputs[nextIndex]);
-				_player2InputsIndex++;
+			if (_player2Frames[nextIndex].time <= time) {
+				_player2.updatePosition(_player2Frames[nextIndex]);
+				_player2FramesIndex++;
 			} else {
 				trace('bad!!!');
 			}
@@ -127,7 +115,7 @@ class PlayState extends FlxState {
 
 		if (FlxG.keys.justPressed.A) {
 			trace('new player here!!!');
-			_player2 = new Player(true);
+			_player2 = new Player(false);
 			time = 0;
 			add(_player2);
 		}
