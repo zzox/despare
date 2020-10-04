@@ -7,13 +7,19 @@ import flixel.addons.editors.tiled.TiledMap;
 import flixel.addons.editors.tiled.TiledObject;
 import flixel.addons.editors.tiled.TiledObjectLayer;
 import flixel.addons.editors.tiled.TiledTileLayer;
+import flixel.effects.particles.FlxEmitter;
+import flixel.effects.particles.FlxParticle;
+import flixel.graphics.frames.FlxBitmapFont;
 import flixel.group.FlxGroup.FlxTypedGroup;
 import flixel.math.FlxPoint;
 import flixel.system.scaleModes.PixelPerfectScaleMode;
+import flixel.text.FlxBitmapText;
 import flixel.tile.FlxBaseTilemap.FlxTilemapAutoTiling;
 import flixel.tile.FlxTilemap;
 import flixel.tweens.FlxTween;
 import flixel.util.helpers.FlxBounds;
+import flixel.util.helpers.FlxRange;
+import openfl.utils.Assets;
 
 typedef Spawner = {
 	var spot:TiledObject;
@@ -23,6 +29,7 @@ typedef Spawner = {
 class PlayState extends FlxState {
 	var _darkCollision:FlxTilemap;
 	var _darkForeground:FlxTilemap;
+	var _darkMiddleground:FlxTilemap;
 	var _playerCollision:FlxTilemap;
 	var _player:Player;
 	var _player2:Null<Player>;
@@ -40,25 +47,40 @@ class PlayState extends FlxState {
 	var time:Float;
 
 	var lives:Int;
-	var coins:Int;
-	var items:Array<String>;
+
+	public var coins:Int;
 
 	var _whiteOverlay:FlxSprite;
 	var _blackOverlay:FlxSprite;
 
 	static inline final MULTIPLIER_TIME = 16;
 
-	public function new(?lives:Int, ?coins:Int, ?items:Array<String>) {
+	var _coinEmitter:FlxEmitter;
+
+	var _worldText:FlxBitmapText;
+	var _exitText:FlxBitmapText;
+
+	var _exitPoint:FlxPoint;
+
+	var level:Int;
+	var playerHealth:Int;
+
+	public function new(level:Int = 0, ?lives:Int, ?playerHealth:Int, ?coins:Int) {
 		super();
 
-		if (lives == null) {
-			lives = 3;
-			coins = 0;
-			items = [];
+		trace("level");
+		trace(level);
+
+		if (level == 0) {
+			trace('i should be here');
+			this.lives = 3;
+			this.coins = 0;
+			this.playerHealth = 3;
 		} else {
+			this.level = level;
 			this.lives = lives;
 			this.coins = lives;
-			this.items = items.copy();
+			this.playerHealth = playerHealth;
 		}
 	}
 
@@ -73,7 +95,7 @@ class PlayState extends FlxState {
 
 		camera.followLerp = 0.5;
 
-		bgColor = 0xffc0cbdc;
+		bgColor = 0xff8b9bb4;
 
 		createMap();
 		startLevel(true);
@@ -84,11 +106,28 @@ class PlayState extends FlxState {
 		playerIndex = 0;
 		_framesets = [[]];
 		_framesetIndexes = [];
+
+		_coinEmitter = new FlxEmitter(50);
+		_coinEmitter.lifespan.set(0.3, 0.5);
+		_coinEmitter.velocity.set(-40, -400, 40, -400);
+		_coinEmitter.acceleration.set(0, 800, 0, 1000);
+		_coinEmitter.launchMode = FlxEmitterMode.SQUARE; // hA!
+		for (i in 0...50) {
+			var p = new FlxParticle();
+			p.loadGraphic(AssetPaths.coins__png, true, 8, 8);
+			p.animation.add('spin', [0, 1, 2, 3], 10, true);
+			p.animation.play('spin');
+			p.exists = false;
+			_coinEmitter.add(p);
+		}
+
+		add(_coinEmitter);
 	}
 
 	override public function update(elapsed:Float) {
 		time += elapsed;
 
+		checkExit();
 		playerFrames();
 
 		_player.touchingFloor = _player.isTouching(FlxObject.DOWN);
@@ -139,28 +178,51 @@ class PlayState extends FlxState {
 			map.tileWidth, map.tileHeight, FlxTilemapAutoTiling.OFF, 1, 1, 1);
 		_darkForeground.setPosition(0, -4);
 
+		_darkMiddleground = new FlxTilemap();
+		_darkMiddleground.loadMapFromArray(cast(map.getLayer('dark-middleground'), TiledTileLayer).tileArray, map.width, map.height, AssetPaths.tiles__png,
+			map.tileWidth, map.tileHeight, FlxTilemapAutoTiling.OFF, 1, 1, 1);
+
 		_playerCollision = new FlxTilemap();
 		_playerCollision.loadMapFromArray(cast(map.getLayer('player-collision'), TiledTileLayer).tileArray, map.width, map.height, AssetPaths.tiles__png,
 			map.tileWidth, map.tileHeight, FlxTilemapAutoTiling.OFF, 1, 1, 1);
 		_playerCollision.visible = false;
 
-		// set world bounds
-		// set camera bounds
+		var textBytes = Assets.getText(AssetPaths.miniset__fnt);
+		var XMLData = Xml.parse(textBytes);
+		var fontAngelCode = FlxBitmapFont.fromAngelCode(AssetPaths.miniset__png, XMLData);
+
+		_worldText = new FlxBitmapText(fontAngelCode);
+		_worldText.setPosition(256, 256);
+		_worldText.text = 'World One';
+		_worldText.color = 0xff181425;
+		_worldText.letterSpacing = -1;
+		_worldText.scale.set(2, 2);
+
+		_exitText = new FlxBitmapText(fontAngelCode);
+		_exitText.setPosition(460, 316);
+		_exitText.text = '10';
+		_exitText.color = 0xffffffff;
+		_exitText.letterSpacing = -1;
 
 		camera.setScrollBoundsRect(32, 32, 640 - 32, 360 - 32);
 		FlxG.worldBounds.set(0, 0, 640, 360);
+
+		var exit = cast(map.getLayer('exit'), TiledObjectLayer).objects[0];
+
+		_exitPoint = new FlxPoint(exit.x, exit.y);
 	}
 
 	function createEntities() {
-		// MD:
-		_player = new Player(232 + playerIndex * 32, 336, true, this, 3);
+		trace('playerHealth');
+		trace(playerHealth);
+		_player = new Player(232 + playerIndex * 32, 336, true, this, playerHealth);
 
 		camera.follow(_player);
 
 		_ghosts = new FlxTypedGroup<Player>();
 		_ghostFeet = new FlxTypedGroup<FlxSprite>();
 		for (i in 0...playerIndex) {
-			var g:Player = new Player(232 + playerIndex * 32, 336, false, this, 3);
+			var g:Player = new Player(232 + playerIndex * 32, 336, false, this, 3); // WARN: health number shouldn't matter here but who knows
 
 			_ghosts.add(g);
 			_ghostFeet.add(g.foot);
@@ -172,15 +234,6 @@ class PlayState extends FlxState {
 	}
 
 	function playerFrames() {
-		// _player2Frames.push({
-		// 	x: _player.x,
-		// 	y: _player.y,
-		// 	acceleration: new FlxPoint(_player.acceleration.x, _player.acceleration.y),
-		// 	velocity: new FlxPoint(_player.velocity.x, _player.velocity.y),
-		// 	kickingTime: _player.kickingTime,
-		// 	time: time
-		// });
-
 		_framesets[playerIndex].push({
 			x: _player.x,
 			y: _player.y,
@@ -215,26 +268,6 @@ class PlayState extends FlxState {
 			}
 			i++;
 		});
-
-		// if (_player2 != null) {
-
-		// 	var nextIndex:Int = _player2FramesIndex + 1;
-		// 	var nextIndex:Int = _player2FramesIndex + 1;
-
-		// 	if (_player2Frames[nextIndex].time <= time) {
-		// 		_player2.updatePosition(_player2Frames[nextIndex]);
-		// 		_player2FramesIndex++;
-		// 	} else {
-		// 		trace('bad!!!');
-		// 	}
-		// }
-
-		// if (FlxG.keys.justPressed.A) {
-		// 	trace('new player here!!!');
-		// 	_player2 = new Player(false, this, 1); // health doesn't matter here
-		// 	time = 0;
-		// 	add(_player2);
-		// }
 	}
 
 	function handleSpawns(elapsed:Float) {
@@ -249,7 +282,6 @@ class PlayState extends FlxState {
 			}
 
 			var elapsedMultiplier:Int = Math.floor(time / MULTIPLIER_TIME) + 1;
-			trace(elapsedMultiplier);
 			spawner.time -= elapsed * elapsedMultiplier;
 		}
 	}
@@ -299,6 +331,9 @@ class PlayState extends FlxState {
 
 		s.map(item -> _spawners.push({spot: item, time: 0.0}));
 
+		add(_darkMiddleground);
+		add(_worldText);
+		add(_exitText);
 		add(_darkCollision);
 		add(_player);
 		add(_player.foot);
@@ -313,10 +348,22 @@ class PlayState extends FlxState {
 		time = 0;
 
 		FlxTween.tween(_blackOverlay, {alpha: 0}, 0.5);
+		FlxTween.tween(_worldText, {alpha: 0, y: 250});
+	}
+
+	public function releaseCoins(x, y, coins) {
+		_coinEmitter.setPosition(x, y);
+		_coinEmitter.start(true, 1, coins);
+	}
+
+	function checkExit() {
+		if (FlxG.keys.pressed.UP && Math.abs(_exitPoint.x - _player.x) < 8 && Math.abs(_exitPoint.y - _player.y) < 8) {
+			nextLevel();
+		}
 	}
 
 	function nextLevel() {
-		FlxG.switchState(new PlayState(lives, coins, items));
+		FlxG.switchState(new StoreState(level, lives, _player._health, coins));
 	}
 
 	function gameOver() {

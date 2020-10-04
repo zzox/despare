@@ -140,6 +140,8 @@ class Slimey extends FlxSprite {
 	}
 
 	function die() {
+		trace('relasing coins');
+		_scene.releaseCoins(x + origin.x, y + origin.y, coins);
 		_scene.coins += coins;
 		deadTime = DEAD_TIME;
 	}

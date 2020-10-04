@@ -34,7 +34,8 @@ class Player extends FlxSprite {
 
 	var jumping:Bool;
 	var jumpTime:Float;
-	var _health:Int;
+
+	public var _health:Int;
 
 	public var deadTime:Float;
 
@@ -58,7 +59,7 @@ class Player extends FlxSprite {
 	var REALLY_HURT_FLASHES:Array<Int> = [0, 0, 1, 1, 1, 1];
 	var hurtFlashIndex:Int = 0;
 
-	public function new(x:Int, y:Int, real, scene:PlayState, health:Int) {
+	public function new(x:Int, y:Int, real, scene:PlayState, _health:Int) {
 		super(x, y);
 
 		if (!real) {
@@ -99,7 +100,11 @@ class Player extends FlxSprite {
 		jumpTime = 0.0;
 		kickingTime = 0.0;
 		deadTime = 0.0;
-		_health = health;
+		this._health = _health;
+
+		trace('this._health');
+		trace(_health);
+		trace(this._health);
 
 		touchingFloor = false;
 		this.real = real;
@@ -270,8 +275,8 @@ class Player extends FlxSprite {
 		hurtTime = HURT_TIME;
 
 		_health -= 1;
-		// trace('player health');
-		// trace(_health);
+		trace('player health');
+		trace(_health);
 
 		if (_health == 0) {
 			deadTime = DEAD_TIME;
