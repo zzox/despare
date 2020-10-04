@@ -1,6 +1,7 @@
 import flixel.FlxG;
 import flixel.FlxSprite;
 import flixel.math.FlxPoint;
+import flixel.util.FlxColor;
 
 typedef PlayerFrame = {
 	var x:Float;
@@ -8,6 +9,7 @@ typedef PlayerFrame = {
 	var velocity:FlxPoint;
 	var acceleration:FlxPoint;
 	var time:Float;
+	var kickingTime:Float;
 }
 
 typedef HoldsObj = {
@@ -18,11 +20,6 @@ typedef HoldsObj = {
 	var jump:Float;
 }
 
-typedef PrevState = {
-	var ?jump:Bool;
-	var ?touchingFoor:Bool;
-}
-
 class Player extends FlxSprite {
 	var holds:HoldsObj;
 	var real:Bool;
@@ -30,17 +27,32 @@ class Player extends FlxSprite {
 	public var touchingFloor:Bool;
 
 	var hurting:Bool;
+	var hurtTime:Float;
 	var jumping:Bool;
 	var jumpTime:Float;
+	var _health:Int;
 
-	var prevState:PrevState;
+	public var kickingTime:Float;
+
+	public var foot:FlxSprite;
+
+	var _scene:PlayState;
 
 	static inline final JUMP_VELOCITY = 150;
 	static inline final RUN_ACCELERATION = 800;
+	static inline final HIT_JUMP_DISTANCE = 10;
 	static inline final GRAVITY = 800;
 	static inline final JUMP_START_TIME = 0.16;
+	static inline final PRE_KICK = 0.00;
+	static inline final KICK_TIME = 0.3;
+	static inline final HURT_TIME = 1.0;
+	static inline final REALLY_HURT = 0.2;
 
-	public function new(real = true) {
+	var HURT_FLASHES:Array<Int> = [0, 1, 1, 0, 1, 1];
+	var REALLY_HURT_FLASHES:Array<Int> = [0, 0, 1, 1, 1, 1];
+	var hurtFlashIndex:Int = 0;
+
+	public function new(real, scene:PlayState, health:Int) {
 		super(100, 300);
 		if (!real) {
 			alpha = 0.7;
@@ -58,6 +70,13 @@ class Player extends FlxSprite {
 		animation.add('shoot', [6]);
 		animation.add('hurt', [7]);
 
+		foot = new FlxSprite(x, y);
+		foot.visible = false;
+		// foot.makeGraphic(16, 16, FlxColor.GREEN);
+		foot.setSize(16, 16);
+
+		handleFoot();
+
 		maxVelocity.set(150, 200);
 
 		holds = {
@@ -68,17 +87,15 @@ class Player extends FlxSprite {
 			jump: 0
 		};
 
-		prevState = {
-			jump: null,
-			touchingFoor: null
-		}
-
 		hurting = false;
 		jumping = false;
 		jumpTime = 0.0;
+		kickingTime = 0.0;
+		_health = health;
 
 		touchingFloor = false;
 		this.real = real;
+		_scene = scene;
 
 		drag.set(1000, 0);
 	}
@@ -91,32 +108,61 @@ class Player extends FlxSprite {
 				vel = vel * 2 / 3;
 			}
 
+			var reallyHurt = hurtTime > HURT_TIME - REALLY_HURT;
+			if (hurting) {
+				if (reallyHurt) {
+					alpha = HURT_FLASHES[hurtFlashIndex];
+				} else {
+					alpha = REALLY_HURT_FLASHES[hurtFlashIndex];
+				}
+
+				hurtFlashIndex++;
+				if (hurtFlashIndex == HURT_FLASHES.length) {
+					hurtFlashIndex = 0;
+				}
+
+				// reset
+				if (hurtTime < 0) {
+					hurting = false;
+					hurtFlashIndex = 0;
+					alpha = 1;
+				}
+			}
+
+			if ((kickingTime > 0 && touchingFloor) || reallyHurt) {
+				vel = 0;
+			}
+
+			if (!reallyHurt /* || (hurting && vel == 0)*/) {
+				acceleration.set(vel * RUN_ACCELERATION, GRAVITY);
+			}
+
+			hurtTime -= elapsed;
 			jumpTime -= elapsed;
+			kickingTime -= elapsed;
 
-			acceleration.set(vel * RUN_ACCELERATION, GRAVITY);
+			var jumpPressed = FlxG.keys.anyJustPressed([Z, SPACE]);
+			var kickPressed = FlxG.keys.anyJustPressed([X, TAB]);
 
-			var jumpPressed = FlxG.keys.anyPressed([Z, SPACE]);
-
-			if (!prevState.jump && jumpPressed && touchingFloor) {
-				jumping = true;
-				jumpTime = JUMP_START_TIME;
-			}
-
-			if (jumping) {
-				velocity.y = -JUMP_VELOCITY;
-
-				if (!jumpPressed || jumpTime <= 0) {
-					jumping = false;
-					jumpTime = 0;
+			if (!reallyHurt) {
+				if (jumpPressed && touchingFloor && kickingTime < 0) {
+					jumping = true;
+					jumpTime = JUMP_START_TIME;
 				}
 
-				if (touchingFloor && jumpTime != JUMP_START_TIME) {
-					jumping = false;
-					jumpTime = 0;
+				if (jumping) {
+					velocity.y = -JUMP_VELOCITY;
+
+					if (!FlxG.keys.anyPressed([Z, SPACE]) || jumpTime <= 0 || (touchingFloor && jumpTime != JUMP_START_TIME)) {
+						jumping = false;
+						jumpTime = 0;
+					}
+				}
+
+				if (kickPressed && kickingTime < 0) {
+					kickingTime = KICK_TIME;
 				}
 			}
-
-			handlePrevState(jumpPressed);
 		}
 
 		if (flipX && acceleration.x < 0) {
@@ -127,6 +173,7 @@ class Player extends FlxSprite {
 			flipX = true;
 		}
 
+		handleFoot();
 		handleAnimation();
 
 		touchingFloor = false;
@@ -139,9 +186,72 @@ class Player extends FlxSprite {
 		y = frame.y;
 		acceleration = frame.acceleration;
 		velocity = frame.velocity;
+		kickingTime = frame.kickingTime;
+	}
+
+	function handleFoot() {
+		if (flipX) {
+			// to carry over to hit calls
+			foot.flipX = true;
+			foot.setPosition(x + 18, y - 2);
+		} else {
+			foot.flipX = false;
+			foot.setPosition(x - 16, y - 2);
+		}
+
+		if (kickingTime > 0 && kickingTime < KICK_TIME - PRE_KICK) {
+			// LATER: combine these
+			FlxG.overlap(_scene._slimeys, foot, hurtSlimey);
+		}
+	}
+
+	public function hurtBySlimey(enemy:Slimey, p:Player) {
+		if (enemy.hurtTime > 0 || hurtTime > 0) {
+			trace('already hurt');
+			return;
+		}
+
+		var hitJump:Float = enemy.y - p.y;
+		if (Math.abs((p.x + (p.width / 2)) - (enemy.x + (enemy.width / 2))) < HIT_JUMP_DISTANCE
+			&& hitJump > 10
+			&& hitJump < 20
+			&& p.velocity.y > 0) {
+			enemy.jumpMe();
+			velocity.set(velocity.x, -maxVelocity.y);
+			return;
+		}
+
+		if (enemy.velocity.x < 0) {
+			velocity.set(-maxVelocity.x, -maxVelocity.y);
+		} else if (enemy.velocity.x > 0) {
+			velocity.set(maxVelocity.x, -maxVelocity.y);
+		} else {
+			velocity.set(0, -maxVelocity.y);
+		}
+
+		hurting = true;
+		hurtTime = HURT_TIME;
+
+		_health -= 1;
+		trace('player health');
+		trace(_health);
+	}
+
+	function hurtSlimey(slimey:Slimey, t:Player) {
+		slimey.kickMe(t);
 	}
 
 	function handleAnimation() {
+		if (kickingTime > 0) {
+			if (kickingTime < KICK_TIME - PRE_KICK) {
+				animation.play('kick');
+			} else {
+				animation.play('setup');
+			}
+
+			return;
+		}
+
 		if (touchingFloor) {
 			if (velocity.x != 0.0) {
 				animation.play('run');
@@ -202,12 +312,5 @@ class Player extends FlxSprite {
 		}
 
 		return vel;
-	}
-
-	function handlePrevState(jumpPressed:Bool) {
-		prevState = {
-			jump: jumpPressed,
-			touchingFoor: touchingFloor
-		}
 	}
 }

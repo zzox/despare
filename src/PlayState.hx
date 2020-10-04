@@ -25,7 +25,8 @@ class PlayState extends FlxState {
 	var _player2:Null<Player>;
 
 	var _spawners:Array<Spawner>;
-	var _slimeys:FlxTypedGroup<Slimey>;
+
+	public var _slimeys:FlxTypedGroup<Slimey>;
 
 	var _player2Frames:Array<Player.PlayerFrame>;
 	var _player2FramesIndex:Int = 0;
@@ -48,6 +49,7 @@ class PlayState extends FlxState {
 
 		add(_darkCollision);
 		add(_player);
+		add(_player.foot);
 		add(_darkForeground);
 		add(_playerCollision);
 		add(_slimeys);
@@ -69,6 +71,13 @@ class PlayState extends FlxState {
 		handleSpawns(elapsed);
 
 		// get rid of dead enemies, or ones off the map
+		_slimeys.forEach((slimey) -> {
+			if (slimey.deadTime < 0) {
+				slimey.destroy();
+				var dead = _slimeys.remove(slimey, true);
+				dead = null;
+			}
+		});
 
 		super.update(elapsed);
 
@@ -77,6 +86,8 @@ class PlayState extends FlxState {
 		FlxG.collide(_darkCollision, _player);
 		FlxG.collide(_playerCollision, _player);
 		FlxG.collide(_darkCollision, _slimeys);
+
+		FlxG.overlap(_slimeys, _player, _player.hurtBySlimey);
 
 		if (_player2 != null) {
 			FlxG.collide(_darkCollision, _player2);
@@ -116,7 +127,8 @@ class PlayState extends FlxState {
 	}
 
 	function createEntities() {
-		_player = new Player(true);
+		// MD:
+		_player = new Player(true, this, 3);
 
 		camera.follow(_player);
 
@@ -130,6 +142,7 @@ class PlayState extends FlxState {
 			y: _player.y,
 			acceleration: new FlxPoint(_player.acceleration.x, _player.acceleration.y),
 			velocity: new FlxPoint(_player.velocity.x, _player.velocity.y),
+			kickingTime: _player.kickingTime,
 			time: time
 		});
 
@@ -146,7 +159,7 @@ class PlayState extends FlxState {
 
 		if (FlxG.keys.justPressed.A) {
 			trace('new player here!!!');
-			_player2 = new Player(false);
+			_player2 = new Player(false, this, 1); // health doesn't matter here
 			time = 0;
 			add(_player2);
 		}
