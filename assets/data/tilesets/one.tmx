@@ -249,7 +249,7 @@
 </data>
  </layer>
  <objectgroup id="6" name="spawners">
-  <object id="1" name="left-ground" x="11.5" y="338">
+  <object id="1" name="left-ground" x="3.5" y="341">
    <properties>
     <property name="direction" value="right"/>
     <property name="enemy" value="slimey"/>
@@ -257,7 +257,7 @@
     <property name="level" type="int" value="1"/>
    </properties>
   </object>
-  <object id="2" name="right-ground" x="629" y="337">
+  <object id="2" name="right-ground" x="632" y="341">
    <properties>
     <property name="direction" value="left"/>
     <property name="enemy" value="slimey"/>

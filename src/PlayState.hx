@@ -50,9 +50,9 @@ class PlayState extends FlxState {
 		add(_darkCollision);
 		add(_player);
 		add(_player.foot);
+		add(_slimeys);
 		add(_darkForeground);
 		add(_playerCollision);
-		add(_slimeys);
 
 		time = 0.0;
 		_player2Frames = [];
@@ -101,17 +101,16 @@ class PlayState extends FlxState {
 		_darkCollision = new FlxTilemap();
 		_darkCollision.loadMapFromArray(cast(map.getLayer('dark-collision'), TiledTileLayer).tileArray, map.width, map.height, AssetPaths.tiles__png,
 			map.tileWidth, map.tileHeight, FlxTilemapAutoTiling.OFF, 1, 1, 1);
-		_darkCollision.alpha = 1;
 
 		_darkForeground = new FlxTilemap();
 		_darkForeground.loadMapFromArray(cast(map.getLayer('dark-foreground'), TiledTileLayer).tileArray, map.width, map.height, AssetPaths.tiles__png,
 			map.tileWidth, map.tileHeight, FlxTilemapAutoTiling.OFF, 1, 1, 1);
-		_darkForeground.alpha = 1;
 		_darkForeground.setPosition(0, -4);
 
 		_playerCollision = new FlxTilemap();
 		_playerCollision.loadMapFromArray(cast(map.getLayer('player-collision'), TiledTileLayer).tileArray, map.width, map.height, AssetPaths.tiles__png,
 			map.tileWidth, map.tileHeight, FlxTilemapAutoTiling.OFF, 1, 1, 1);
+		_playerCollision.visible = false;
 
 		// set world bounds
 		// set camera bounds
@@ -122,7 +121,7 @@ class PlayState extends FlxState {
 
 		s.map(item -> _spawners.push({spot: item, time: 0.0}));
 
-		camera.setScrollBoundsRect(0, 0, 640, 360);
+		camera.setScrollBoundsRect(32, 32, 640 - 32, 360 - 32);
 		FlxG.worldBounds.set(0, 0, 640, 360);
 	}
 

@@ -44,6 +44,7 @@ class Slimey extends FlxSprite {
 		if (deadTime > 0) {
 			color = 0x000000;
 			deadTime -= elapsed;
+			alpha = deadTime / DEAD_TIME;
 		}
 
 		hurtTime -= elapsed;
