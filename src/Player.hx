@@ -1,5 +1,6 @@
 import flixel.FlxG;
 import flixel.FlxSprite;
+import flixel.graphics.frames.FlxFilterFrames;
 import flixel.math.FlxPoint;
 import flixel.util.FlxColor;
 
@@ -10,6 +11,8 @@ typedef PlayerFrame = {
 	var acceleration:FlxPoint;
 	var time:Float;
 	var kickingTime:Float;
+	var hurtTime:Float;
+	var hurting:Bool;
 }
 
 typedef HoldsObj = {
@@ -26,14 +29,16 @@ class Player extends FlxSprite {
 
 	public var touchingFloor:Bool;
 
-	var hurting:Bool;
-	var hurtTime:Float;
+	public var hurting:Bool;
+	public var hurtTime:Float;
+
 	var jumping:Bool;
 	var jumpTime:Float;
 	var _health:Int;
 
-	public var kickingTime:Float;
+	public var deadTime:Float;
 
+	public var kickingTime:Float;
 	public var foot:FlxSprite;
 
 	var _scene:PlayState;
@@ -47,13 +52,15 @@ class Player extends FlxSprite {
 	static inline final KICK_TIME = 0.3;
 	static inline final HURT_TIME = 1.0;
 	static inline final REALLY_HURT = 0.2;
+	public static inline final DEAD_TIME = 1.0;
 
 	var HURT_FLASHES:Array<Int> = [0, 1, 1, 0, 1, 1];
 	var REALLY_HURT_FLASHES:Array<Int> = [0, 0, 1, 1, 1, 1];
 	var hurtFlashIndex:Int = 0;
 
-	public function new(real, scene:PlayState, health:Int) {
-		super(100, 300);
+	public function new(x:Int, y:Int, real, scene:PlayState, health:Int) {
+		super(x, y);
+
 		if (!real) {
 			alpha = 0.7;
 		}
@@ -91,6 +98,7 @@ class Player extends FlxSprite {
 		jumping = false;
 		jumpTime = 0.0;
 		kickingTime = 0.0;
+		deadTime = 0.0;
 		_health = health;
 
 		touchingFloor = false;
@@ -101,32 +109,50 @@ class Player extends FlxSprite {
 	}
 
 	override public function update(elapsed:Float) {
+		if (deadTime > 0) {
+			deadTime -= elapsed;
+			velocity.set(0, 0);
+			acceleration.set(0, 0);
+			color = 0x000000;
+			animation.play('hurt');
+			super.update(elapsed);
+
+			if (!real) {
+				alpha = deadTime / DEAD_TIME * 0.7;
+			}
+			return;
+		}
+
+		var reallyHurt = hurtTime > HURT_TIME - REALLY_HURT;
+		if (hurting) {
+			if (reallyHurt) {
+				alpha = HURT_FLASHES[hurtFlashIndex];
+			} else {
+				alpha = REALLY_HURT_FLASHES[hurtFlashIndex];
+			}
+
+			hurtFlashIndex++;
+			if (hurtFlashIndex == HURT_FLASHES.length) {
+				hurtFlashIndex = 0;
+			}
+
+			// reset
+			if (hurtTime < 0) {
+				hurting = false;
+				hurtFlashIndex = 0;
+				alpha = 1;
+			}
+
+			if (!real && alpha == 1) {
+				alpha = 0.7;
+			}
+		}
+
 		if (real) {
 			var vel = handleInputs(elapsed);
 
 			if (!touchingFloor) {
 				vel = vel * 2 / 3;
-			}
-
-			var reallyHurt = hurtTime > HURT_TIME - REALLY_HURT;
-			if (hurting) {
-				if (reallyHurt) {
-					alpha = HURT_FLASHES[hurtFlashIndex];
-				} else {
-					alpha = REALLY_HURT_FLASHES[hurtFlashIndex];
-				}
-
-				hurtFlashIndex++;
-				if (hurtFlashIndex == HURT_FLASHES.length) {
-					hurtFlashIndex = 0;
-				}
-
-				// reset
-				if (hurtTime < 0) {
-					hurting = false;
-					hurtFlashIndex = 0;
-					alpha = 1;
-				}
 			}
 
 			if ((kickingTime > 0 && touchingFloor) || reallyHurt) {
@@ -163,6 +189,10 @@ class Player extends FlxSprite {
 					kickingTime = KICK_TIME;
 				}
 			}
+		} else {
+			if (deadTime < 0) {
+				return;
+			}
 		}
 
 		if (flipX && acceleration.x < 0) {
@@ -187,6 +217,8 @@ class Player extends FlxSprite {
 		acceleration = frame.acceleration;
 		velocity = frame.velocity;
 		kickingTime = frame.kickingTime;
+		hurtTime = frame.hurtTime;
+		hurting = frame.hurting;
 	}
 
 	function handleFoot() {
@@ -206,8 +238,7 @@ class Player extends FlxSprite {
 	}
 
 	public function hurtBySlimey(enemy:Slimey, p:Player) {
-		if (enemy.hurtTime > 0 || hurtTime > 0) {
-			trace('already hurt');
+		if (real && (enemy.hurtTime > 0 || hurtTime > 0)) {
 			return;
 		}
 
@@ -217,7 +248,13 @@ class Player extends FlxSprite {
 			&& hitJump < 20
 			&& p.velocity.y > 0) {
 			enemy.jumpMe();
-			velocity.set(velocity.x, -maxVelocity.y);
+			if (p.real) {
+				velocity.set(velocity.x, -maxVelocity.y);
+			}
+			return;
+		}
+
+		if (!p.real) {
 			return;
 		}
 
@@ -233,8 +270,15 @@ class Player extends FlxSprite {
 		hurtTime = HURT_TIME;
 
 		_health -= 1;
-		trace('player health');
-		trace(_health);
+		// trace('player health');
+		// trace(_health);
+
+		if (_health == 0) {
+			deadTime = DEAD_TIME;
+			if (real) {
+				_scene.killLevel();
+			}
+		}
 	}
 
 	function hurtSlimey(slimey:Slimey, t:Player) {

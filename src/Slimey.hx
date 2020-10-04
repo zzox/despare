@@ -21,7 +21,11 @@ class Slimey extends FlxSprite {
 	var HURT_FLASHES:Array<Int> = [0, 1, 1, 0, 1, 1];
 	var hurtFlashIndex:Int = 0;
 
-	public function new(x:Int, y:Int, direction:String, level:Int) {
+	var coins:Int;
+
+	var _scene:PlayState;
+
+	public function new(scene:PlayState, x:Int, y:Int, direction:String, level:Int) {
 		super(x, y);
 
 		loadGraphic(AssetPaths.slimey__png, true, 24, 24);
@@ -38,6 +42,10 @@ class Slimey extends FlxSprite {
 		_health = level + 1;
 		hurtTime = 0;
 		deadTime = 0;
+
+		coins = level * level;
+
+		_scene = scene;
 	}
 
 	override public function update(elapsed:Float) {
@@ -132,6 +140,7 @@ class Slimey extends FlxSprite {
 	}
 
 	function die() {
+		_scene.coins += coins;
 		deadTime = DEAD_TIME;
 	}
 }
