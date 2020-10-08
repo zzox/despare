@@ -11,6 +11,7 @@ import flixel.effects.particles.FlxEmitter;
 import flixel.effects.particles.FlxParticle;
 import flixel.graphics.frames.FlxBitmapFont;
 import flixel.group.FlxGroup.FlxTypedGroup;
+import flixel.group.FlxGroup;
 import flixel.math.FlxPoint;
 import flixel.system.scaleModes.PixelPerfectScaleMode;
 import flixel.text.FlxBitmapText;
@@ -68,11 +69,7 @@ class PlayState extends FlxState {
 	public function new(level:Int = 0, ?lives:Int, ?playerHealth:Int, ?coins:Int) {
 		super();
 
-		trace("level");
-		trace(level);
-
 		if (level == 0) {
-			trace('i should be here');
 			this.lives = 3;
 			this.coins = 0;
 			this.playerHealth = 3;
@@ -213,8 +210,6 @@ class PlayState extends FlxState {
 	}
 
 	function createEntities() {
-		trace('playerHealth');
-		trace(playerHealth);
 		_player = new Player(232 + playerIndex * 32, 336, true, this, playerHealth);
 
 		camera.follow(_player);
